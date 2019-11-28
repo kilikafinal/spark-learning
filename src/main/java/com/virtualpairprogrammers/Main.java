@@ -35,7 +35,6 @@ public class Main {
         originalLogMessages.foreach(tuple -> System.out.println(tuple._1 + " has " + tuple._2 + " instances"));
 
 
-
         sc.close();
     }
 }
