@@ -3,6 +3,7 @@ package com.virtualpairprogrammers;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.codehaus.janino.Java;
@@ -15,25 +16,37 @@ import java.util.List;
 
 public class Main {
 
-  public static void main(String[] args) {
-    List<String> inputData = new ArrayList<>();
-    inputData.add("WARN: Tuesday 4 September 0405");
-    inputData.add("ERROR: Tuesday 4 September 0408");
-    inputData.add("FATAL: Wednesday 5 September 1632");
-    inputData.add("ERROR: Friday 7 September 1854");
-    inputData.add("WARN: Saturday 8 September 1942");
+    public static void main(String[] args) {
 
-    Logger.getLogger("org.apache").setLevel(Level.WARN);
+        String path = "src/main/resources/subtitles/input.txt";
+        Logger.getLogger("org.apache").setLevel(Level.WARN);
 
-    SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
-    JavaSparkContext sc = new JavaSparkContext(conf);
+        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+        JavaSparkContext sc = new JavaSparkContext(conf);
 
-    String path = "src/main/resources/test.txt";
-    sc.textFile(path)
-        .flatMap(value -> Arrays.asList(value.split(" ")).iterator())
-        .collect()
-        .forEach(System.out::println);
+        JavaRDD<String> initialRdd = sc.textFile(path);
 
-    sc.close();
-  }
+        JavaRDD<String> noSpecialCharsRdd = initialRdd.map(sentence -> sentence.replaceAll("[^a-zA-Z\\s]", "").toLowerCase());
+
+        JavaRDD<String> noLinesRdd = noSpecialCharsRdd.filter(sentence -> sentence.trim().length() > 0 );
+
+        JavaRDD<String> dividedWords = noLinesRdd.flatMap(line -> Arrays.asList(line.split(" ")).iterator());
+
+        dividedWords = dividedWords.filter(word -> word.trim().length() > 0);
+
+        JavaRDD<String> interestingWords = dividedWords.filter(words -> Util.isNotBoring(words));
+
+        JavaPairRDD<String, Long> pairRdd = interestingWords.mapToPair(word -> new Tuple2<>(word, 1L));
+
+        JavaPairRDD<String, Long> totals = pairRdd.reduceByKey((value1, value2) -> value1 + value2);
+
+        JavaPairRDD<Long, String> switched = totals.mapToPair(tuple -> new Tuple2<Long, String>(tuple._2, tuple._1));
+
+
+        JavaPairRDD<Long, String> ordered = switched.sortByKey(false);
+        List<Tuple2<Long, String>> results = ordered.take(10);
+        results.forEach(System.out::println);
+
+        sc.close();
+    }
 }
