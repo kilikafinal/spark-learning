@@ -16,37 +16,38 @@ import java.util.List;
 
 public class Main {
 
-    public static void main(String[] args) {
+  public static void main(String[] args) {
 
-        String path = "src/main/resources/subtitles/input.txt";
-        Logger.getLogger("org.apache").setLevel(Level.WARN);
+    String path = "src/main/resources/subtitles/input.txt";
+    Logger.getLogger("org.apache").setLevel(Level.WARN);
 
-        SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
-        JavaSparkContext sc = new JavaSparkContext(conf);
+    System.setProperty("hadoop.home.dir", "c:/hadoop");
+    Logger.getLogger("org.apache").setLevel(Level.WARN);
 
-        JavaRDD<String> initialRdd = sc.textFile(path);
+    SparkConf conf = new SparkConf().setAppName("startingSpark").setMaster("local[*]");
+    JavaSparkContext sc = new JavaSparkContext(conf);
 
-        JavaRDD<String> noSpecialCharsRdd = initialRdd.map(sentence -> sentence.replaceAll("[^a-zA-Z\\s]", "").toLowerCase());
+    List<Tuple2<Integer,Integer>> visitsRaw = new ArrayList<>();
+    visitsRaw.add(new Tuple2<>(4,18));
+    visitsRaw.add(new Tuple2<>(6,4));
+    visitsRaw.add(new Tuple2<>(10,9));
 
-        JavaRDD<String> noLinesRdd = noSpecialCharsRdd.filter(sentence -> sentence.trim().length() > 0 );
+      List<Tuple2<Integer,String>> usersRaw = new ArrayList<>();
+      usersRaw.add(new Tuple2<>(1, "John"));
+      usersRaw.add(new Tuple2<>(2, "Bob"));
+      usersRaw.add(new Tuple2<>(3, "Alan"));
+      usersRaw.add(new Tuple2<>(4, "Doris"));
+      usersRaw.add(new Tuple2<>(5, "Marybelle"));
+      usersRaw.add(new Tuple2<>(6, "Rachel"));
+      usersRaw.add(new Tuple2<>(7, "asdf"));
 
-        JavaRDD<String> dividedWords = noLinesRdd.flatMap(line -> Arrays.asList(line.split(" ")).iterator());
+      JavaPairRDD<Integer, Integer> visits = sc.parallelizePairs(visitsRaw);
+      JavaPairRDD<Integer, String> users = sc.parallelizePairs(usersRaw);
 
-        dividedWords = dividedWords.filter(word -> word.trim().length() > 0);
+      JavaPairRDD<Integer, Tuple2<Integer, String>> joinedRdd = visits.join(users);
 
-        JavaRDD<String> interestingWords = dividedWords.filter(words -> Util.isNotBoring(words));
+    joinedRdd.collect().forEach(System.out::println);
 
-        JavaPairRDD<String, Long> pairRdd = interestingWords.mapToPair(word -> new Tuple2<>(word, 1L));
-
-        JavaPairRDD<String, Long> totals = pairRdd.reduceByKey((value1, value2) -> value1 + value2);
-
-        JavaPairRDD<Long, String> switched = totals.mapToPair(tuple -> new Tuple2<Long, String>(tuple._2, tuple._1));
-
-
-        JavaPairRDD<Long, String> ordered = switched.sortByKey(false);
-        List<Tuple2<Long, String>> results = ordered.take(10);
-        results.forEach(System.out::println);
-
-        sc.close();
-    }
+      sc.close();
+  }
 }
